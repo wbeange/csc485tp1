@@ -3,6 +3,7 @@
 	$client_id		= "51295b2530f1b1654966c0b4b64eaeca";
 	$track_id		= 87274383;
 
+	//get the number of comments
 	$url = "https://api.soundcloud.com/tracks/".$track_id.".json?client_id=".$client_id;
 
 	$curl = curl_init($url);

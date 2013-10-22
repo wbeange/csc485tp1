@@ -44,9 +44,55 @@
 	}
 
 	/**
-	* Calculate phrase sentiment.
+	* Build positive words dictionary.
+	*/	
+	function getPositiveWordsArray()
+	{
+		return getWordsArray("positive_words.txt");
+	}
+
+	/**
+	* Build negative words dictionary.
+	*/	
+	function getNegativeWordsArray()
+	{
+		return getWordsArray("negative_words.txt");
+	}
+
+	/**
+	* Build words dictionary.
 	*/
-	function calculatePhraseSentiment($phrase, $sentiments_array)
+	function getWordsArray($file)
+	{
+		$sentiments_array 	= array();
+		$file 				= fopen($file, "r");
+
+		while(!feof($file))
+		{
+		    $word = fgets($file);
+		    $sentiments_array[(string)$word] = (string)$word;
+		}
+		
+		fclose($file);		
+
+		return $sentiments_array;		
+	}
+
+	/**
+	* Clean up a phrase, make it ready for analysis.
+	* Put all lower case.
+	* TODO: Consider a slang translator.
+	*/
+	function cleanUpPhrase($phrase)
+	{	
+		return strtolower($phrase);
+	}
+
+	/**
+	* Calculate phrase sentiment.
+	* Strategy 1: Sum up sentiment scores.
+	*/
+	function sumPhraseSentiment($phrase, $sentiments_array)
 	{
 		$sentiment = 0;
 		$words = explode(" ", $phrase);
@@ -63,31 +109,111 @@
 	}
 
 	/**
-	* Calculate the comment sentiment
+	* Calculate phrase sentiment.
+	* Strategy 2: Average sentiment scores.
 	*/
-	function calculateCommentSentiment($comments_array, $sentiments_array, $count)
+	function averagePhraseSentiment($phrase, $sentiments_array)
+	{
+		$sentiment_avg 			= 0;
+		$sentiment_word_count 	= 0;
+
+		$words = explode(" ", $phrase);
+
+		foreach($words as $word)
+		{
+			if(isset($sentiments_array[$word]) === TRUE)
+			{
+				$sentiment_word_count++;
+
+				$sentiment_avg += $sentiments_array[$word];
+			}
+		}
+
+		if($sentiment_word_count > 0)
+		{
+			$sentiment_avg = ceil($sentiment_avg / $sentiment_word_count);
+		}
+	
+		return $sentiment_avg;
+	}
+
+	/**
+	* Calculate phrase sentiment.
+	* Strategy 3: Positive - Negative words.
+	*/
+	function positiveMinusNegativePhraseSentiment($phrase, $positive_words_array, $negative_words_array)
+	{
+		$positive_words = 0;
+		$negative_words = 0;
+
+		$words = explode(" ", $phrase);
+
+		foreach($words as $word)
+		{
+			if(isset($positive_words_array[$word]) === TRUE)
+			{
+				$positive_words++;
+			}
+			elseif(isset($negative_words_array[$word]) === TRUE)
+			{
+				$negative_words++;
+			}
+		}
+
+		return ($positive_words - $negative_words);
+	}
+
+	/**
+	* Calculate the happiest comments, using a number of strategies.
+	*
+	* @param $comment_array 		- Track comments
+	* @param $sentiments_array 		- Sentiments dictionary
+	* @param $positive_words_array 	- Positive word dictionary
+	* @param $negative_words_array 	- Negative word dictionary
+	* @param $strategy 				- Strategy 1. Use sentiments dictionary and sum up sentiment words.
+	* @param $strategy 				- Strategy 2. Use sentiments dictionary and average sentiment words.
+	* @param $strategy 				- Strategy 3. Use positive and negative word dictionaries and subtract the number of negative words
+	* @param $count 				-
+	*
+	*/
+	function calculateCommentSentiment($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, $strategy=1, $count=10)
 	{
 		$comment_sentiments_array = array();
 
 		#calculate each sentiment
 		foreach($comments_array as $id => $comment)
 		{
-			$sentiment = calculatePhraseSentiment($comment["body"], $sentiments_array);
+			if($strategy == 1)
+			{
+				$score = sumPhraseSentiment(cleanUpPhrase($comment["body"]), $sentiments_array);
+			}
+			elseif($strategy == 2)
+			{
+				$score = averagePhraseSentiment(cleanUpPhrase($comment["body"]), $sentiments_array);
+			}
+			else
+			{
+				$score = positiveMinusNegativePhraseSentiment(cleanUpPhrase($comment["body"]), $positive_words_array, $negative_words_array);
+			}
+			
 
 			$comment_sentiments_array[] = array(
 				'id'	=> $id,
-				'score'	=> $sentiment,
+				'score'	=> $score,
 			);
 		}		
 
 		return $comment_sentiments_array;
 	}
 
-	function getHappiestComments($comments_array, $sentiments_array, $count=10)
+	/**
+	* Get happiest comments.
+	*/
+	function getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, $strategy=1, $count=10)
 	{
-		$comment_sentiments_array = calculateCommentSentiment($comments_array, $sentiments_array, $count);
+		$comment_sentiments_array = calculateCommentSentiment($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, $strategy, $count);
 
-		#sort happiest desc
+		//sort happiest desc
 		usort($comment_sentiments_array, function($a, $b)
 		{
 			if($a['score'] > $b['score'])
@@ -104,30 +230,38 @@
 			}
 		});
 
-		#slice array to get happiest
+		//slice array to get happiest
 		$comment_sentiments_array = array_slice($comment_sentiments_array, 0, $count);
 
-		#print output
-		$rtn_array = array();
-		print("Happiest Comments:\n\n");		
+		//print output
+		if($strategy == 1)
+		{
+			printf("*** Happiest Comments Strategy ONE: ***\n\n");
+		}
+		elseif($strategy == 2)
+		{
+			printf("*** Happiest Comments Strategy TWO: ***\n\n");
+		}
+		else
+		{
+			printf("*** Happiest Comments Strategy THREE: ***\n\n");
+		}
+		
 		foreach($comment_sentiments_array as $data)
 		{
-			$rtn_array[] = $comments_array[$data['id']];
 			print($comments_array[$data['id']]["body"] . "\n");
 		}
 		printf("\n");
-
-		return $rtn_array;
 	}
 
 	/**
 	* Calculate the most negative comments.
 	*/
-	function getNegativestComments($comments_array, $sentiments_array, $count=10)
+	function getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, $strategy=1, $count=10)
 	{
-		$comment_sentiments_array = calculateCommentSentiment($comments_array, $sentiments_array, $count);
+		$comment_sentiments_array = calculateCommentSentiment($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, $strategy, $count);
 
-		#sort
+		//sort negative desc
 		usort($comment_sentiments_array, function($a, $b)
 		{
 			if($a['score'] > $b['score'])
@@ -144,19 +278,28 @@
 			}
 		});
 
-		#get most negative
+		//get most negative
 		$comment_sentiments_array = array_slice($comment_sentiments_array, 0, $count);
 
-		print("\n\nMost Negative Comments:\n\n");
-		$rtn_array = array();
+		//print output
+		if($strategy == 1)
+		{
+			printf("*** Most Negative Comments Strategy ONE: ***\n\n");
+		}
+		elseif($strategy == 2)
+		{
+			printf("*** Most Negative Comments Strategy TWO: ***\n\n");
+		}
+		else
+		{
+			printf("*** Most Negative Comments Strategy THREE: ***\n\n");
+		}		
 
 		foreach($comment_sentiments_array as $data)
 		{
-			$rtn_array[] = $comments_array[$data['id']];
 			print($comments_array[$data['id']]["body"] . "\n");
 		}
-
-		return $rtn_array;
+		printf("\n");
 	}
 
 	/**
@@ -196,7 +339,7 @@
 		});
 
 		#analyze loudest users comments
-		printf("\n\nLoudest user's comments:\n\n");
+		printf("\nLoudest user's comments:\n\n");
 		$loudest_displayed = 0;
 		
 		foreach($users_array as $user_id => $count)
@@ -216,6 +359,7 @@
 			}
 			printf("\n\n");
 		}
+		printf("\n");
 	}
 
 	/**
@@ -236,7 +380,8 @@
 				$users_array[$comment["user"]["id"]] = 0;
 			}
 
-			$sentiment = calculatePhraseSentiment($comment['body'], $sentiments_array);
+//TODO
+			//$sentiment = calculatePhraseSentiment($comment['body'], $sentiments_array);
 
 			$users_array[$comment["user"]["id"]] += $sentiment;
 		}
@@ -259,7 +404,7 @@
 		});
 
 		#analyze most positive users comments
-		printf("\n\nMost positive user's comments:\n\n");
+		printf("\nMost positive user's comments:\n\n");
 		$displayed = 0;
 		
 		foreach($users_array as $user_id => $count)
@@ -279,6 +424,8 @@
 			}
 			printf("\n\n");
 		}
+
+		printf("\n");
 	}
 
 	function getMostNegativeTrackFans($comments_array, $sentiments_array, $fan_count=1)
@@ -293,7 +440,8 @@
 				$users_array[$comment["user"]["id"]] = 0;
 			}
 
-			$sentiment = calculatePhraseSentiment($comment['body'], $sentiments_array);
+//TODO			
+			//$sentiment = calculatePhraseSentiment($comment['body'], $sentiments_array);
 
 			$users_array[$comment["user"]["id"]] += $sentiment;
 		}
@@ -316,7 +464,7 @@
 		});
 
 		#analyze least positive users comments
-		printf("\n\nMost negative user's comments:\n\n");
+		printf("\nMost negative user's comments:\n\n");
 		$displayed = 0;
 		
 		foreach($users_array as $user_id => $count)
@@ -336,6 +484,7 @@
 			}
 			printf("\n\n");
 		}
+		printf("\n");
 	}
 
 	/**
@@ -421,6 +570,8 @@
 
 		$displayed = 0;
 
+		printf("\nMost commented parts of the track:\n\n");
+		
 		foreach($time_array as $interval => $data)
 		{
 			$start_sec = ($interval * $interval_slice);
@@ -437,6 +588,7 @@
 				break;
 			}
 		}
+		printf("\n");
 	}
 
 	function getLeastPopularTrackTime()
@@ -528,10 +680,14 @@
 		//sorts by value, maintains key association, orders high to low
 		arsort($song_count_array);
 
+		printf("\nAvicii Mix New Song Ranking:\n\n");
+
 		foreach($song_count_array as $song_id => $count)
 		{
 			printf("Comments: ".$count.", Song name: ".$avicii_promo_mix_array[$song_id]."\n");
 		}
+
+		printf("\n");
 	}
 
 	function main()
@@ -546,11 +702,19 @@
 		//Get sentiments keyed dictionary
 		$sentiments_array 	= getSentimentsArray();
 
+		//Get word dictionaries
+		$positive_words_array = getPositiveWordsArray();
+		$negative_words_array = getNegativeWordsArray();
+
 		//1. What are the happiest comments?
-		getHappiestComments($comments_array, $sentiments_array, 10);
+		getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 1, 10);
+		#getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 2, 10);
+		#getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 3, 10);
 
 		//2. What are the most negative comments?
-		#getNegativestComments($comments_array, $sentiments_array, 10);
+		getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 1, 10);
+		#getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 2, 10);
+		#getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 3, 10);
 
 		//3. Who is the artist’s biggest SoundCloud fan?
 		#getLoudestTrackFan($comments_array, $sentiments_array, 10);
@@ -560,7 +724,7 @@
 		#getMostNegativeTrackFans($comments_array, $sentiments_array, 10);
 
 		//5. What is the most popular moment in the track?
-		#getMostPopularTrackTime($comments_array, 5, 50);
+		#getMostPopularTrackTime($comments_array, 5, 25);
 
 		//8. The 1 hour set plays all 10 of the new Avicii tracks. Which is the most popular?
 		#aviciiPromoMixMostPopularTrack($comments_array);
