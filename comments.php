@@ -5,10 +5,10 @@
 	/**
 	* Get the comments from the text file and return it in an array.
 	*/
-	function getCommentsArray()
+	function getCommentsArray($file_name)
 	{
 		$comments_array = array();
-		$file 			= fopen("comments.txt", "r");
+		$file 			= fopen($file_name, "r");
 
 		while(!feof($file))
 		{
@@ -310,7 +310,7 @@
 	{
 		$users_array = array();
 
-		#sum up user comment count
+		//sum up user comment count
 		foreach($comments_array as $comment)
 		{
 			if(isset($users_array[$comment["user"]["id"]]) === FALSE)
@@ -321,7 +321,7 @@
 			$users_array[$comment["user"]["id"]]++;
 		}
 
-		#get user with most comments
+		//get user with most comments
 		uasort($users_array, function($a, $b)
 		{
 			if($a < $b)
@@ -338,13 +338,13 @@
 			}
 		});
 
-		#analyze loudest users comments
+		//analyze loudest users comments
 		printf("\nLoudest user's comments:\n\n");
 		$loudest_displayed = 0;
 		
 		foreach($users_array as $user_id => $count)
 		{
-			printf("User id ".$user_id." (".$count." comment(s)\n");
+			printf("User id ".$user_id." (".$count." comment(s))\n");
 			foreach($comments_array as $comment)
 			{
 				if($comment["user"]["id"] == $user_id)
@@ -365,14 +365,14 @@
 	/**
 	* Get the most positive track fan, as defined by the user
 	* who posts the most sentimental comments (summed up)
-	* And the print out those comments so that we can see what they are for
+	* And then print out those comments so that we can see what they are for
 	* for further analysis.
 	*/
 	function getMostPositiveTrackFan($comments_array, $sentiments_array, $fan_count=1)
 	{
 		$users_array = array();
 
-		#sum up user comment count
+		//sum up user comment count
 		foreach($comments_array as $comment)
 		{
 			if(isset($users_array[$comment["user"]["id"]]) === FALSE)
@@ -380,13 +380,12 @@
 				$users_array[$comment["user"]["id"]] = 0;
 			}
 
-//TODO
-			//$sentiment = calculatePhraseSentiment($comment['body'], $sentiments_array);
+			$score = sumPhraseSentiment(cleanUpPhrase($comment["body"]), $sentiments_array);
 
-			$users_array[$comment["user"]["id"]] += $sentiment;
+			$users_array[$comment["user"]["id"]] += $score;
 		}
 
-		#get user with most sentiment total
+		//get user with most sentiment total
 		uasort($users_array, function($a, $b)
 		{
 			if($a < $b)
@@ -403,7 +402,7 @@
 			}
 		});
 
-		#analyze most positive users comments
+		//analyze most positive users comments
 		printf("\nMost positive user's comments:\n\n");
 		$displayed = 0;
 		
@@ -432,7 +431,7 @@
 	{
 		$users_array = array();
 
-		#sum up user comment count
+		//sum up user comment count
 		foreach($comments_array as $comment)
 		{
 			if(isset($users_array[$comment["user"]["id"]]) === FALSE)
@@ -440,13 +439,12 @@
 				$users_array[$comment["user"]["id"]] = 0;
 			}
 
-//TODO			
-			//$sentiment = calculatePhraseSentiment($comment['body'], $sentiments_array);
+			$score = sumPhraseSentiment(cleanUpPhrase($comment["body"]), $sentiments_array);
 
-			$users_array[$comment["user"]["id"]] += $sentiment;
+			$users_array[$comment["user"]["id"]] += $score;
 		}
 
-		#get user with least sentiment total
+		//get user with least sentiment total
 		uasort($users_array, function($a, $b)
 		{
 			if($a < $b)
@@ -463,7 +461,7 @@
 			}
 		});
 
-		#analyze least positive users comments
+		//analyze least positive users comments
 		printf("\nMost negative user's comments:\n\n");
 		$displayed = 0;
 		
@@ -485,31 +483,6 @@
 			printf("\n\n");
 		}
 		printf("\n");
-	}
-
-	/**
-	* Calculate the country with the most comment participation.
-	*/
-	function getLoudestCountry($comments_array, $display=1)
-	{
-		$country_array = array();
-
-		foreach($comments_array as $comment)
-		{
-			var_dump($comment);
-			break;
-			
-			//TODO: Would need to get user data.
-			//See if SoundCloud API has a primed get multi user call.
-		}
-
-
-		return $country_array;
-	}
-
-	function getMostPositiveCountry()
-	{
-		return FALSE;
 	}
 
 	/**
@@ -589,11 +562,6 @@
 			}
 		}
 		printf("\n");
-	}
-
-	function getLeastPopularTrackTime()
-	{
-
 	}
 
 	function aviciiPromoMixMostPopularTrack($comments_array)
@@ -692,51 +660,45 @@
 
 	function main()
 	{
-		/*
-		How consistent has activity been since the track was released?
-		*/
+		$comments_file = "comments.txt";
 
 		//Get comments in naturally index array
-		$comments_array 	= getCommentsArray();
+		$comments_array 		= getCommentsArray($comments_file);
 
 		//Get sentiments keyed dictionary
-		$sentiments_array 	= getSentimentsArray();
+		$sentiments_array 		= getSentimentsArray();
 
 		//Get word dictionaries
-		$positive_words_array = getPositiveWordsArray();
-		$negative_words_array = getNegativeWordsArray();
+		$positive_words_array 	= getPositiveWordsArray();
+		$negative_words_array 	= getNegativeWordsArray();
 
 		//1. What are the happiest comments?
 		getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 1, 10);
-		#getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 2, 10);
-		#getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 3, 10);
+		getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 2, 10);
+		getHappiestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 3, 10);
 
 		//2. What are the most negative comments?
 		getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 1, 10);
-		#getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 2, 10);
-		#getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 3, 10);
+		getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 2, 10);
+		getNegativestComments($comments_array, $sentiments_array, $positive_words_array, $negative_words_array, 3, 10);
 
 		//3. Who is the artist’s biggest SoundCloud fan?
-		#getLoudestTrackFan($comments_array, $sentiments_array, 10);
-		#getMostPositiveTrackFan($comments_array, $sentiments_array, 10);		
+		getLoudestTrackFan($comments_array, $sentiments_array, 10);
+		getMostPositiveTrackFan($comments_array, $sentiments_array, 10);		
 		
 		//4. Who is the artist’s biggest SoundCloud hater?
-		#getMostNegativeTrackFans($comments_array, $sentiments_array, 10);
+		getMostNegativeTrackFans($comments_array, $sentiments_array, 10);
 
 		//5. What is the most popular moment in the track?
-		#getMostPopularTrackTime($comments_array, 5, 25);
-
-		//8. The 1 hour set plays all 10 of the new Avicii tracks. Which is the most popular?
-		#aviciiPromoMixMostPopularTrack($comments_array);
+		getMostPopularTrackTime($comments_array, 60, 25);
 
 		//6. What country likes the artist the most?
 		//What country likes the artist the most?
 		//What country hates the artist the most?
-		#getLoudestCountry($comments_array, 10);
-		#getMostPositiveCountry();
-		#getMostNegativeCountry();
-
-		//7. How consistent has activity been since the track was released?
+		#getCountryMetrics($comments_array, $sentiments_array);
+		
+		//7. The 1 hour set plays all 10 of the new Avicii tracks. Which is the most popular?
+		aviciiPromoMixMostPopularTrack($comments_array);
 
 	}
 
